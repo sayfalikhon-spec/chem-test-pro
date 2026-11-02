@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="tg">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ХимияТест</title>
+<style>
+:root{--bg:#f2f6f4;--card:#fff;--ink:#12302b;--mut:#5b716c;--acc:#0f766e;--line:#d5e0dc;--ok:#15803d;--bad:#b91c1c;--okbg:#dcfce7;--badbg:#fee2e2}
+@media(prefers-color-scheme:dark){:root{--bg:#0e1b19;--card:#162825;--ink:#e6f2ef;--mut:#93aaa5;--acc:#2dd4bf;--line:#28413d;--ok:#4ade80;--bad:#f87171;--okbg:#12361f;--badbg:#401818}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding-bottom:70px}
+header{padding:16px;border-bottom:1px solid var(--line)}
+h1{margin:0;font-size:22px}
+h2{font-size:18px;margin:0 0 10px}
+main{max-width:640px;margin:0 auto;padding:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:12px}
+input,textarea,select{width:100%;padding:11px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font:inherit;margin:4px 0 10px}
+button{font:inherit;cursor:pointer;border:1px solid var(--acc);background:var(--acc);color:#fff;border-radius:8px;padding:11px 16px}
+button.ghost{background:transparent;color:var(--acc)}
+button.full{width:100%}
+button:focus-visible,input:focus-visible,textarea:focus-visible{outline:3px solid var(--acc);outline-offset:2px}
+.opt{display:block;width:100%;text-align:left;background:var(--bg);color:var(--ink);border:1px solid var(--line);margin:6px 0}
+.opt.sel{border-color:var(--acc);box-shadow:inset 0 0 0 2px var(--acc)}
+.opt.ok{background:var(--okbg);border-color:var(--ok)}
+.opt.bad{background:var(--badbg);border-color:var(--bad)}
+nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:var(--card);border-top:1px solid var(--line)}
+nav button{flex:1;background:none;color:var(--mut);border:0;border-radius:0;padding:14px 2px;font-size:13px}
+nav button.on{color:var(--acc);font-weight:700;box-shadow:inset 0 3px 0 var(--acc)}
+.ph{height:12px;border-radius:6px;background:linear-gradient(90deg,#dc2626,#f59e0b,#eab308,#22c55e,#0ea5e9,#6366f1,#7c3aed);position:relative;margin:14px 0 6px}
+.ph i{position:absolute;top:-5px;width:4px;height:22px;background:var(--ink);border-radius:2px;transform:translateX(-2px)}
+.mut{color:var(--mut);font-size:14px}
+.row{display:flex;justify-content:space-between;gap:8px;align-items:center}
+.big{font-size:44px;font-weight:800;line-height:1}
+.err{color:var(--bad);font-size:14px;min-height:18px}
+table{width:100%;border-collapse:collapse}td,th{padding:8px 4px;border-bottom:1px solid var(--line);text-align:left}
+</style>
+</head>
+<body>
+<header><h1>ХимияТест</h1><div class="mut" id="who"></div></header>
+<main id="app"></main>
+<nav id="nav"></nav>
+<script>
+const TEST_MIN=20;
+
+// ---------- Сервер (API) ----------
+let token=localStorage.getItem("token"), me=localStorage.getItem("name"), data={};
+let tab="test", test=null, timer=null, authMode="login", err="";
+const $=s=>document.querySelector(s);
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+async function api(path,method="GET",body){
+ const r=await fetch("/api"+path,{method,headers:{"Content-Type":"application/json",Authorization:"Bearer "+token},body:body?JSON.stringify(body):undefined});
+ const j=await r.json().catch(()=>({}));
+ if(r.status===401&&token){logout();throw new Error("auth")}
+ if(!r.ok)throw new Error(j.error||"Хатогӣ");
+ return j;
+}
+
+// ---------- Дохилшавӣ ----------
+function authView(){
+ return `<div class="card"><h2>${authMode==="login"?"Ворид шудан":"Сабти ном"}</h2>
+ <label>Ном<input id="n" autocomplete="username"></label>
+ <label>Рамз<input id="p" type="password" autocomplete="current-password"></label>
+ <div class="err">${err}</div>
+ <button class="full" onclick="auth()">${authMode==="login"?"Ворид шудан":"Сабти ном"}</button>
+ <p class="mut" style="text-align:center"><a href="#" onclick="authMode=authMode==='login'?'reg':'login';err='';render();return false">${authMode==="login"?"Профили нав месозам":"Профил дорам"}</a></p></div>`;
+}
+async function auth(){
+ const n=$("#n").value.trim(), p=$("#p").value;
+ try{
+  const j=await api("/auth","POST",{mode:authMode,name:n,pass:p});
+  data={};token=j.token;me=j.name;localStorage.setItem("token",token);localStorage.setItem("name",me);
+  err="";tab="test";render();
+ }catch(e){err=e.message;render()}
+}
+function logout(){
+ data={};token=null;me=null;test=null;clearInterval(timer);
+ localStorage.removeItem("token");localStorage.removeItem("name");render();
+}
+
+// ---------- Тест ----------
+async function startTest(topic){
+ try{
+  const j=await api("/test/start","POST",{topic});
+  test={id:j.id,qs:j.questions,ans:Array(j.questions.length).fill(-1),i:0,left:TEST_MIN*60,done:false,topic};
+ }catch(e){return alert(e.message)}
+ clearInterval(timer);
+ timer=setInterval(()=>{if(!test||test.done)return clearInterval(timer);test.left--;if(test.left<=0)finish();else{const e=$("#tm");if(e)e.textContent=fmt(test.left)}},1000);
+ render();
+}
+const fmt=s=>String(Math.floor(s/60)).padStart(2,"0")+":"+String(s%60).padStart(2,"0");
+function pick(j){if(test.done)return;test.ans[test.i]=j;render()}
+function go(d){test.i=Math.max(0,Math.min(test.qs.length-1,test.i+d));render()}
+async function finish(){
+ if(!test||test.done||test.busy)return;
+ test.busy=true;clearInterval(timer);
+ try{const j=await api("/test/finish","POST",{id:test.id,answers:test.ans});test.done=true;test.score=j.score;test.correct=j.correct}
+ catch(e){alert(e.message);test.busy=false;return}
+ render();
+}
+function testView(){
+ if(!test){
+  const topics=data.topics||[];
+  return `<div class="card"><h2>Тести нав</h2>
+  <p class="mut">${TEST_SIZE} савол, ${TEST_MIN} дақиқа. Саволҳо тасодуфӣ интихоб мешаванд.</p>
+  <select id="topic"><option value="all">Ҳамаи мавзӯъҳо</option>${topics.map(t=>`<option>${t}</option>`).join("")}</select>
+  <button class="full" onclick="startTest($('#topic').value)">Оғоз кардани тест</button></div>`;
+ }
+ if(test.done){
+  const pct=Math.round(test.score/test.qs.length*100);
+  return `<div class="card"><h2>Натиҷа</h2><div class="big">${test.score}/${test.qs.length}</div>
+  <div class="ph"><i style="left:${pct}%"></i></div><div class="mut">${pct}% ҷавобҳои дуруст</div></div>
+  ${test.qs.map((q,i)=>`<div class="card"><b>${i+1}. ${q.q}</b>${q.o.map((o,j)=>`<div class="opt ${j===test.correct[i]?"ok":j===test.ans[i]?"bad":""}" style="padding:8px 12px;border-radius:8px">${o}</div>`).join("")}</div>`).join("")}
+  <button class="full" onclick="test=null;render()">Тести нав</button>`;
+ }
+ const q=test.qs[test.i], last=test.i===test.qs.length-1;
+ return `<div class="card"><div class="row"><span class="mut">Савол ${test.i+1} аз ${test.qs.length}</span><b id="tm">${fmt(test.left)}</b></div>
+ <h2 style="margin-top:10px">${q.q}</h2>
+ ${q.o.map((o,j)=>`<button class="opt ${test.ans[test.i]===j?"sel":""}" onclick="pick(${j})">${"ABCD"[j]}) ${o}</button>`).join("")}
+ <div class="row" style="margin-top:12px"><button class="ghost" onclick="go(-1)" ${test.i===0?"disabled":""}>Қафо</button>
+ ${last?`<button onclick="if(confirm('Тестро анҷом медиҳед?'))finish()">Анҷом додан</button>`:`<button onclick="go(1)">Пеш</button>`}</div></div>`;
+}
+
+// ---------- Рейтинг ва Профил ----------
+function stats(u){const r=u.results;if(!r.length)return{n:0,avg:0,best:0};
+ const p=r.map(x=>x.score/x.total*100);return{n:r.length,avg:Math.round(p.reduce((a,b)=>a+b)/p.length),best:Math.round(Math.max(...p))}}
+function rankView(){
+ const rows=data.rank||[];
+ return `<div class="card"><h2>Рейтинг</h2><table><tr><th>#</th><th>Ном</th><th>Миёна</th><th>Тест</th></tr>
+ ${rows.map((r,i)=>`<tr><td>${i+1}</td><td>${esc(r.name)}${r.name===me?" (шумо)":""}</td><td>${r.avg}%</td><td>${r.n}</td></tr>`).join("")}</table></div>`;
+}
+function profileView(){
+ const u=data.me, s=stats(u);
+ return `<div class="card"><h2>${esc(u.name)}</h2>
+ <div class="row"><div><div class="big">${s.avg}%</div><span class="mut">натиҷаи миёна</span></div>
+ <div><div class="big">${s.best}%</div><span class="mut">беҳтарин</span></div>
+ <div><div class="big">${s.n}</div><span class="mut">тест</span></div></div>
+ <div class="ph"><i style="left:${s.avg}%"></i></div></div>
+ <div class="card"><h2>Таърихи тестҳо</h2>${u.results.length?`<table>${[...u.results].reverse().map(r=>`<tr><td>${new Date(r.date).toLocaleString()}</td><td>${esc(r.topic==="all"?"Ҳама":r.topic)}</td><td><b>${r.score}/${r.total}</b></td></tr>`).join("")}</table>`:`<p class="mut">Ҳанӯз тест надодаед. Ба бахши «Тест» равед.</p>`}</div>
+ <button class="ghost full" onclick="logout()">Баромадан</button>`;
+}
+
+// ---------- Саволу ҷавоб ----------
+function qaView(){
+ return `<div class="card"><h2>Саволи нав</h2>
+ <textarea id="pq" rows="3" placeholder="Саволи худро нависед..."></textarea>
+ <button class="full" onclick="addPost()">Фиристодан</button></div>
+ ${(data.posts||[]).length?[...data.posts].reverse().map(p=>`<div class="card"><b>${esc(p.q)}</b>
+ <div class="mut">${esc(p.by)} · ${new Date(p.date).toLocaleDateString()}</div>
+ ${p.answers.map(a=>`<div style="border-top:1px solid var(--line);margin-top:8px;padding-top:8px">${esc(a.text)}<div class="mut">${esc(a.by)}</div></div>`).join("")}
+ <textarea id="a${p.id}" rows="2" placeholder="Ҷавоб нависед..."></textarea>
+ <button class="ghost" onclick="addAns(${p.id})">Ҷавоб додан</button></div>`).join(""):`<p class="mut">Ҳанӯз савол нест. Аввалин шуда савол диҳед.</p>`}`;
+}
+async function addPost(){const t=$("#pq").value.trim();if(!t)return;
+ try{await api("/posts","POST",{q:t});render()}catch(e){alert(e.message)}}
+async function addAns(id){const t=$("#a"+id).value.trim();if(!t)return;
+ try{await api("/posts/"+id+"/answers","POST",{text:t});render()}catch(e){alert(e.message)}}
+
+function adminView(){
+ const L=data.adm||[];
+ return `<div class="card"><h2>Саволи нав</h2>
+ <input id="at" placeholder="Мавзӯъ (масалан: Органикӣ)">
+ <textarea id="aq" rows="2" placeholder="Матни савол"></textarea>
+ ${[0,1,2,3].map(i=>`<input id="ao${i}" placeholder="Вариант ${"ABCD"[i]}">`).join("")}
+ <select id="aa">${[0,1,2,3].map(i=>`<option value="${i}">Ҷавоби дуруст: ${"ABCD"[i]}</option>`).join("")}</select>
+ <button class="full" onclick="addQ()">Илова кардан</button></div>
+ <div class="card"><h2>Саволҳо (${L.length})</h2>${L.map(q=>`<div style="border-top:1px solid var(--line);padding:8px 0"><b>${esc(q.q)}</b><div class="mut">${esc(q.t)} · дуруст: ${"ABCD"[q.a]}</div><button class="ghost" onclick="delQ(${q.id})">Нест кардан</button></div>`).join("")}</div>`;
+}
+async function addQ(){
+ const o=[0,1,2,3].map(i=>$("#ao"+i).value.trim());
+ try{await api("/admin/questions","POST",{t:$("#at").value.trim(),q:$("#aq").value.trim(),o,a:Number($("#aa").value)});render()}catch(e){alert(e.message)}
+}
+async function delQ(id){
+ if(!confirm("Нест мекунед?"))return;
+ try{await api("/admin/questions/"+id,"DELETE");render()}catch(e){alert(e.message)}
+}
+
+// ---------- Асосӣ ----------
+async function render(){
+ const app=$("#app"), nav=$("#nav");
+ $("#who").textContent=me?"Салом, "+me:"Омодагӣ ба тести миллӣ";
+ if(!me){nav.innerHTML="";app.innerHTML=authView();return}
+ try{
+  if(!data.me||tab==="me")data.me=await api("/me");
+  if(tab==="test"&&!test)data.topics=await api("/topics");
+  if(tab==="rank")data.rank=await api("/rank");
+  if(tab==="qa")data.posts=await api("/posts");
+  if(tab==="admin")data.adm=await api("/admin/questions");
+ }catch(e){
+  if(e.message==="auth")return;
+  app.innerHTML='<div class="card err">Сервер ҷавоб намедиҳад. Боварӣ ҳосил кунед, ки «node server.js» кор мекунад.</div>';return;
+ }
+ const tabs=[["test","Тест"],["qa","Саволу ҷавоб"],["rank","Рейтинг"],["me","Профил"]];
+ if(data.me.isAdmin)tabs.push(["admin","Админ"]);
+ nav.innerHTML=tabs.map(([k,l])=>`<button class="${tab===k?"on":""}" onclick="tab='${k}';render()">${l}</button>`).join("");
+ app.innerHTML={test:testView,qa:qaView,rank:rankView,me:profileView,admin:adminView}[tab]();
+}
+render();
+</script>
+</body>
+</html>
