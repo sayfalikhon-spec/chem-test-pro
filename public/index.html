@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="tg">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0b3b36">
+<title>CHEM TEST PRO</title>
+<style>
+:root{--bg:#f3f6f4;--card:#fff;--ink:#15332e;--mut:#637771;--acc:#08796d;--line:#dce6e1;--good:#168044;--bad:#bd3434;--soft:#e8f4ef;--shadow:0 8px 24px #173b3010}
+@media(prefers-color-scheme:dark){:root{--bg:#0b1715;--card:#142521;--ink:#e7f3ef;--mut:#9bb0aa;--acc:#35c7ae;--line:#29423b;--good:#55d68a;--bad:#ff7777;--soft:#19372d;--shadow:none}}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;padding-bottom:86px}
+header{background:linear-gradient(130deg,#092e2a,#08796d);color:#fff;padding:17px 16px;display:flex;align-items:center;gap:12px;box-shadow:0 5px 18px #002c2520}
+.logo{width:48px;height:48px;border:2px solid #ffffffb8;border-radius:14px;display:grid;place-items:center;font-weight:900;font-size:21px;flex:none}
+h1{font-size:19px;margin:0;letter-spacing:.4px}header small{opacity:.8}main{max-width:680px;margin:auto;padding:15px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:17px;padding:16px;margin:0 0 13px;box-shadow:var(--shadow)}
+h2{font-size:19px;line-height:1.3;margin:0 0 12px}.mut{color:var(--mut);font-size:13px}.hero{text-align:center;padding:25px 12px}.hero .symbol{font-size:42px}.hero h2{font-size:24px;margin:8px 0}.hero p{margin:0;color:var(--mut)}
+input,textarea,select{width:100%;padding:13px;border:1.5px solid var(--line);border-radius:11px;background:var(--bg);color:var(--ink);font:inherit;margin:5px 0 12px;outline:none}
+input:focus,textarea:focus,select:focus{border-color:var(--acc)}label{font-size:14px;font-weight:650}
+button{font:inherit;font-weight:650;border:1px solid var(--acc);background:var(--acc);color:#fff;padding:12px 15px;border-radius:11px;cursor:pointer}
+button:disabled{opacity:.4;cursor:not-allowed}.full{width:100%}.ghost{background:transparent;color:var(--acc)}.link{border:0;background:none;color:var(--acc);padding:5px}
+.err{color:var(--bad);font-size:13px;min-height:18px}.row{display:flex;justify-content:space-between;align-items:center;gap:9px}.row>*{min-width:0}
+.opt{display:flex;align-items:center;gap:11px;width:100%;text-align:left;background:var(--bg);color:var(--ink);border:1.5px solid var(--line);margin:8px 0;font-weight:450}
+.opt .letter{width:29px;height:29px;display:grid;place-items:center;border-radius:8px;background:var(--card);border:1px solid var(--line);font-weight:800;flex:none}
+.opt.selected{border-color:var(--acc);box-shadow:inset 0 0 0 1px var(--acc)}.opt.correct{background:#dcfce7;color:#14532d;border-color:#16a34a}.opt.wrong{background:#fee2e2;color:#7f1d1d;border-color:#dc2626}
+.progress{height:8px;background:var(--line);border-radius:9px;overflow:hidden;margin:12px 0}.progress i{display:block;height:100%;background:var(--acc)}
+.timer{font:700 14px ui-monospace,monospace;background:var(--soft);padding:5px 10px;border-radius:20px}
+nav{position:fixed;z-index:5;bottom:0;left:0;right:0;display:flex;background:var(--card);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0)}
+nav button{flex:1;border:0;border-radius:0;background:none;color:var(--mut);font-size:11px;padding:9px 2px;display:flex;flex-direction:column;align-items:center;gap:2px}
+nav button span{font-size:20px}nav button.active{color:var(--acc);box-shadow:inset 0 3px var(--acc)}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.stat{background:var(--bg);padding:12px 6px;border-radius:12px;text-align:center}.stat b{display:block;font-size:25px}.stat small{font-size:11px;color:var(--mut)}
+table{width:100%;border-collapse:collapse;font-size:14px}td,th{text-align:left;padding:10px 5px;border-bottom:1px solid var(--line)}tr.me{background:var(--soft)}
+.pill{display:inline-block;background:var(--soft);color:var(--acc);border-radius:30px;padding:4px 10px;font-size:12px}
+.result{text-align:center}.score{font-size:42px;font-weight:850;letter-spacing:-2px}.post-answer{border-top:1px solid var(--line);padding-top:9px;margin-top:9px}
+@media(min-width:600px){main{padding:22px}.card{padding:20px}}
+</style>
+</head>
+<body>
+<header><div class="logo">C</div><div><h1>CHEM TEST PRO</h1><small id="who">Омодагӣ ба тести миллӣ</small></div></header>
+<main id="app"><div class="card">Бор шуда истодааст...</div></main>
+<nav id="nav"></nav>
+<script>
+const TEST_SIZE=10, TEST_MIN=20;
+let token=localStorage.getItem("chem_token"), me=localStorage.getItem("chem_name"), data={}, tab="test", test=null, timer=null, authMode="login", err="";
+const $=s=>document.querySelector(s);
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+async function api(path,method="GET",body){
+ const r=await fetch("/api"+path,{method,headers:{"Content-Type":"application/json",...(token?{Authorization:"Bearer "+token}:{})},body:body===undefined?undefined:JSON.stringify(body)});
+ const j=await r.json().catch(()=>({}));
+ if(r.status===401&&token){logout(false);throw new Error("Сессия ба охир расид. Аз нав ворид шавед.")}
+ if(!r.ok)throw new Error(j.error||"Хатогии сервер");
+ return j;
+}
+function authView(){return `<section class="hero"><div class="symbol">⚗️</div><h2>Химияро бо тест омӯз!</h2><p>Саволҳо · натиҷаҳо · рейтинг</p></section><div class="card"><h2>${authMode==="login"?"Ворид шудан":"Сабти ном"}</h2><label>Номи корбар</label><input id="n" maxlength="30" autocomplete="username" placeholder="Номатон"><label>Рамз</label><input id="p" type="password" maxlength="100" autocomplete="current-password" placeholder="Камаш 4 аломат"><div class="err">${esc(err)}</div><button class="full" onclick="auth()">${authMode==="login"?"Ворид шудан":"Сабти ном"}</button><p class="mut" style="text-align:center">${authMode==="login"?"Ҳоло профил надоред?":"Аллакай профил доред?"} <button class="link" onclick="authMode=authMode==='login'?'reg':'login';err='';render()">${authMode==="login"?"Сабти ном":"Ворид шудан"}</button></p><p class="mut">Эзоҳ: аввалин корбари сабтиномшуда администратор мешавад.</p></div>`}
+async function auth(){const n=$("#n").value.trim(),p=$("#p").value;try{const j=await api("/auth","POST",{mode:authMode,name:n,pass:p});token=j.token;me=j.name;localStorage.setItem("chem_token",token);localStorage.setItem("chem_name",me);data={};tab="test";err="";await render()}catch(e){err=e.message;render()}}
+async function logout(callApi=true){clearInterval(timer);if(callApi&&token){try{await api("/logout","POST",{})}catch{}}token=null;me=null;test=null;data={};localStorage.removeItem("chem_token");localStorage.removeItem("chem_name");render()}
+const fmt=s=>String(Math.floor(s/60)).padStart(2,"0")+":"+String(s%60).padStart(2,"0");
+function startClock(){clearInterval(timer);timer=setInterval(()=>{if(!test||test.done){clearInterval(timer);return}test.left--;const el=$("#tm");if(el)el.textContent=fmt(test.left);if(test.left<=0)finish()},1000)}
+async function startTest(topic){try{const j=await api("/test/start","POST",{topic});test={id:j.id,qs:j.questions,ans:Array(j.questions.length).fill(-1),i:0,left:TEST_MIN*60,done:false,busy:false,topic};startClock();render()}catch(e){alert(e.message)}}
+function pick(i){if(!test||test.done)return;test.ans[test.i]=i;render()}
+function go(d){test.i=Math.max(0,Math.min(test.qs.length-1,test.i+d));render()}
+async function finish(){if(!test||test.done||test.busy)return;test.busy=true;clearInterval(timer);try{const j=await api("/test/finish","POST",{id:test.id,answers:test.ans});test.done=true;test.score=j.score;test.correct=j.correct;render()}catch(e){test.busy=false;alert(e.message)}}
+function testView(){
+ if(!test){const topics=data.topics||[];return `<div class="card"><span class="pill">ОМОДАГӢ БА ММТ</span><h2 style="margin-top:12px">Тести нав</h2><p class="mut">${TEST_SIZE} савол · то ${TEST_MIN} дақиқа. Агар дар мавзӯъ савол кам бошад, ҳамаи саволҳои мавҷуда дода мешаванд.</p><label>Мавзӯъро интихоб кунед</label><select id="topic"><option value="all">Ҳамаи мавзӯъҳо</option>${topics.map(t=>`<option value="${esc(t)}">${esc(t)}</option>`).join("")}</select><button class="full" onclick="startTest($('#topic').value)">Оғоз кардани тест →</button></div><div class="card"><h2>Мавзӯъҳои дастрас</h2>${topics.map(t=>`<span class="pill" style="margin:3px">${esc(t)}</span>`).join("")}</div>`}
+ if(test.done){const pct=Math.round(test.score/test.qs.length*100);return `<div class="card result"><div style="font-size:34px">🏆</div><h2>Натиҷаи шумо</h2><div class="score">${test.score}/${test.qs.length}</div><div class="progress"><i style="width:${pct}%"></i></div><b>${pct}% ҷавобҳои дуруст</b><p class="mut">${pct>=80?"Аъло! Ҳамин тавр давом диҳед.":pct>=50?"Натиҷаи хуб. Боз машқ кунед.":"Мавзӯъҳоро такрор карда, боз кӯшиш кунед."}</p></div>${test.qs.map((q,i)=>`<div class="card"><b>${i+1}. ${esc(q.q)}</b>${q.o.map((o,j)=>`<div class="opt ${j===test.correct[i]?"correct":j===test.ans[i]&&j!==test.correct[i]?"wrong":""}" style="padding:9px 11px;border-radius:10px">${"ABCD"[j]}. ${esc(o)}</div>`).join("")}</div>`).join("")}<button class="full" onclick="test=null;render()">Тести нав</button>`}
+ const q=test.qs[test.i],last=test.i===test.qs.length-1;
+ return `<div class="card"><div class="row"><span class="mut">Саволи ${test.i+1} аз ${test.qs.length}</span><b class="timer" id="tm">${fmt(test.left)}</b></div><div class="progress"><i style="width:${(test.i+1)/test.qs.length*100}%"></i></div><h2 style="margin:17px 0">${esc(q.q)}</h2>${q.o.map((o,j)=>`<button class="opt ${test.ans[test.i]===j?"selected":""}" onclick="pick(${j})"><span class="letter">${"ABCD"[j]}</span><span>${esc(o)}</span></button>`).join("")}<div class="row" style="margin-top:15px"><button class="ghost" onclick="go(-1)" ${test.i===0?"disabled":""}>← Қафо</button>${last?`<button onclick="if(confirm('Тестро анҷом медиҳед?'))finish()">Анҷом додан</button>`:`<button onclick="go(1)">Пеш →</button>`}</div></div>`;
+}
+function stats(u){const r=u.results||[];if(!r.length)return{n:0,avg:0,best:0};const p=r.map(x=>x.total?x.score/x.total*100:0);return{n:r.length,avg:Math.round(p.reduce((a,b)=>a+b,0)/p.length),best:Math.round(Math.max(...p))}}
+function rankView(){return `<div class="card"><h2>🏆 Рейтинг</h2><table><tr><th>#</th><th>Ном</th><th>Миёна</th><th>Тест</th></tr>${(data.rank||[]).map((r,i)=>`<tr class="${r.name===me?"me":""}"><td>${["🥇","🥈","🥉"][i]||i+1}</td><td>${esc(r.name)}${r.name===me?" (шумо)":""}</td><td>${r.avg}%</td><td>${r.n}</td></tr>`).join("")}</table>${!(data.rank||[]).length?'<p class="mut">Ҳоло корбар нест.</p>':""}</div>`}
+function profileView(){const u=data.me,s=stats(u);return `<div class="card"><div style="font-size:34px">👤</div><h2>${esc(u.name)}</h2>${u.isAdmin?'<span class="pill">Администратор</span>':""}<div class="stats" style="margin-top:15px"><div class="stat"><b>${s.avg}%</b><small>Миёна</small></div><div class="stat"><b>${s.best}%</b><small>Беҳтарин</small></div><div class="stat"><b>${s.n}</b><small>Тестҳо</small></div></div></div><div class="card"><h2>Таърихи тестҳо</h2>${u.results.length?`<table>${[...u.results].reverse().map(r=>`<tr><td>${new Date(r.date).toLocaleDateString("tg-TJ")}</td><td>${esc(r.topic==="all"?"Ҳама":r.topic)}</td><td><b>${r.score}/${r.total}</b></td></tr>`).join("")}</table>`:'<p class="mut">Ҳанӯз тест надодаед.</p>'}</div><button class="ghost full" onclick="logout()">Баромадан</button>`}
+function qaView(){return `<div class="card"><h2>💬 Саволи нав</h2><textarea id="pq" rows="3" maxlength="1000" placeholder="Саволи худро нависед..."></textarea><button class="full" onclick="addPost()">Фиристодан</button></div>${(data.posts||[]).length?[...data.posts].reverse().map(p=>`<div class="card"><b>${esc(p.q)}</b><div class="mut">${esc(p.by)} · ${new Date(p.date).toLocaleDateString("tg-TJ")}</div>${(p.answers||[]).map(a=>`<div class="post-answer">${esc(a.text)}<div class="mut">${esc(a.by)}</div></div>`).join("")}<textarea id="a${p.id}" rows="2" maxlength="1000" placeholder="Ҷавоб нависед..."></textarea><button class="ghost" onclick="addAns(${p.id})">Ҷавоб додан</button></div>`).join(""):'<div class="card mut">Ҳоло савол нест. Аввалин шуда савол диҳед.</div>'}`}
+async function addPost(){const el=$("#pq"),q=el.value.trim();if(!q)return;try{await api("/posts","POST",{q});await render()}catch(e){alert(e.message)}}
+async function addAns(id){const el=$("#a"+id),text=el.value.trim();if(!text)return;try{await api("/posts/"+id+"/answers","POST",{text});await render()}catch(e){alert(e.message)}}
+function adminView(){const qs=data.adm||[];return `<div class="card"><h2>⚙️ Иловаи савол</h2><label>Мавзӯъ</label><input id="at" maxlength="40" placeholder="Масалан: Органикӣ"><label>Савол</label><textarea id="aq" rows="2" maxlength="500" placeholder="Матни савол"></textarea>${[0,1,2,3].map(i=>`<label>Варианти ${"ABCD"[i]}</label><input id="ao${i}" maxlength="200" placeholder="Ҷавоби ${"ABCD"[i]}">`).join("")}<label>Ҷавоби дуруст</label><select id="aa"><option value="0">A</option><option value="1">B</option><option value="2">C</option><option value="3">D</option></select><button class="full" onclick="addQ()">Илова кардан</button></div><div class="card"><h2>Саволҳо (${qs.length})</h2>${qs.map(q=>`<div style="border-top:1px solid var(--line);padding:10px 0"><b>${esc(q.q)}</b><div class="mut">${esc(q.t)} · ҷавоби дуруст: ${"ABCD"[q.a]}</div><button class="ghost" onclick="delQ(${q.id})">Нест кардан</button></div>`).join("")}</div>`}
+async function addQ(){const o=[0,1,2,3].map(i=>$("#ao"+i).value.trim());try{await api("/admin/questions","POST",{t:$("#at").value.trim(),q:$("#aq").value.trim(),o,a:Number($("#aa").value)});await render();alert("Савол илова шуд.")}catch(e){alert(e.message)}}
+async function delQ(id){if(!confirm("Ин савол нест карда шавад?"))return;try{await api("/admin/questions/"+id,"DELETE");await render()}catch(e){alert(e.message)}}
+async function render(){
+ const app=$("#app"),nav=$("#nav");$("#who").textContent=me?"Салом, "+me:"Омодагӣ ба тести миллӣ";
+ if(!me){nav.innerHTML="";app.innerHTML=authView();return}
+ const tabs=[["test","🧪","Тест"],["qa","💬","Саволу ҷавоб"],["rank","🏆","Рейтинг"],["me","👤","Профил"]];
+ try{
+  if(!data.me||tab==="me")data.me=await api("/me");
+  if(tab==="test"&&!test)data.topics=await api("/topics");
+  if(tab==="rank")data.rank=await api("/rank");
+  if(tab==="qa")data.posts=await api("/posts");
+  if(tab==="admin")data.adm=await api("/admin/questions");
+ }catch(e){if(e.message.includes("Сессия"))return;app.innerHTML=`<div class="card err">${esc(e.message)}<p class="mut">Санҷед, ки сервер фаъол аст.</p></div>`;return}
+ if(data.me.isAdmin)tabs.push(["admin","⚙️","Админ"]);
+ nav.innerHTML=tabs.map(([k,ico,label])=>`<button class="${tab===k?"active":""}" onclick="tab='${k}';render()"><span>${ico}</span>${label}</button>`).join("");
+ app.innerHTML={test:testView,qa:qaView,rank:rankView,me:profileView,admin:adminView}[tab]();
+}
+render();
+</script>
+</body>
+</html>
